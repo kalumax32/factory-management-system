@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Receipts by Date Range</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 40px; 
+            background-color: #f4f7f6; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #333; 
+            text-align: center;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+            overflow-x: auto;
+            display: block;
+        }
+        th, td { 
+            text-align: left; 
+            padding: 12px; 
+            border-bottom: 1px solid #ddd; 
+            white-space: nowrap;
+        }
+        th { 
+            background-color: #f9f9f9; 
+        }
+        tr:hover { 
+            background-color: #f1f1f1; 
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* Navigation bar styles */
+        .navbar {
+            background-color: #343a40;
+            padding: 15px 0;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        
+        .nav-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .nav-item {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-item:hover {
+            background-color: #495057;
+        }
+        
+        .nav-item.active {
+            background-color: #007bff;
+        }
+        
+        /* Date range form styles */
+        .date-form {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .form-group {
+            display: inline-block;
+            margin-right: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .form-group input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        
+        .btn-export {
+            background-color: #28a745;
+            float: right;
+        }
+        
+        .btn-export:hover {
+            background-color: #218838;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .number-cell {
+            text-align: right;
+        }
+        
+        /* Horizontal table styles */
+        .horizontal-table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        
+        .horizontal-table {
+            min-width: 100%;
+        }
+        
+        .horizontal-table th:first-child,
+        .horizontal-table td:first-child {
+            position: sticky;
+            left: 0;
+            background-color: #f9f9f9;
+            z-index: 1;
+        }
+        
+        /* Date format explanation */
+        .date-format-info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-item">Inventory</a>
+            <a href="/stock-issues" class="nav-item">Stock Issues</a>
+            <a href="/stock-issues-date-range" class="nav-item">Stock Issues by Date Range</a>
+            <a href="/stock-receipts" class="nav-item">Stock Receipts</a>
+            <a href="/stock-receipts-date-range" class="nav-item active">Stock Receipts by Date Range</a>
+            <a href="/transaction-history" class="nav-item">Transaction History</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h1>Stock Receipts by Date Range</h1>
+        <p>Select a date range to view stock receipts in horizontal format and export to Excel.</p>
+        <p class="date-format-info">Dates are displayed in format: date.month.year (e.g., 2.7.2025)</p>
+        
+        <!-- Date Range Form -->
+        <div class="date-form">
+            <div class="form-group">
+                <label for="start-date">Start Date:</label>
+                <input type="date" id="start-date">
+            </div>
+            <div class="form-group">
+                <label for="end-date">End Date:</label>
+                <input type="date" id="end-date">
+            </div>
+            <button class="btn" id="fetch-data-btn">Fetch Data</button>
+            <button class="btn btn-export" id="export-btn" disabled>Export to Excel</button>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="date-form">
+            <div class="form-group" style="width: 100%;">
+                <label for="product-search">Search Products:</label>
+                <input type="text" id="product-search" placeholder="Enter product name or S.No. to filter results..." style="width: 100%; padding: 8px; margin: 5px 0;">
+            </div>
+        </div>
+        
+        <!-- Data Table -->
+        <div id="receipts-container">
+            <div class="loading">Please select a date range and click "Fetch Data"</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000';
+        const receiptsContainer = document.getElementById('receipts-container');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        const fetchDataBtn = document.getElementById('fetch-data-btn');
+        const exportBtn = document.getElementById('export-btn');
+        const productSearch = document.getElementById('product-search');
+        
+        // Set default dates (last 30 days)
+        const today = new Date();
+        const lastMonth = new Date();
+        lastMonth.setDate(today.getDate() - 30);
+        
+        // Format dates as YYYY-MM-DD
+        const formatDate = (date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        
+        // Wait for DOM to be fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            startDateInput.value = formatDate(lastMonth);
+            endDateInput.value = formatDate(today);
+
+            // Fetch data button event listener
+            fetchDataBtn.addEventListener('click', fetchStockReceiptsByDateRange);
+            
+            // Export to Excel button event listener
+            exportBtn.addEventListener('click', exportToExcel);
+            
+            // Search input event listener
+            productSearch.addEventListener('input', filterTable);
+        });
+        
+        /**
+         * Fetches stock receipts data within a date range from the API
+         */
+        async function fetchStockReceiptsByDateRange() {
+            const startDate = startDateInput.value;
+            const endDate = endDateInput.value;
+            
+            if (!startDate || !endDate) {
+                alert('Please select both start and end dates');
+                return;
+            }
+            
+            try {
+                receiptsContainer.innerHTML = '<div class="loading">Loading data...</div>';
+                
+                const response = await fetch(`${API_URL}/api/stock-receipts-date-range-horizontal?start_date=${startDate}&end_date=${endDate}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const receipts = await response.json();
+                console.log('Received data:', receipts); // Debug log
+                displayStockReceiptsHorizontal(receipts);
+                
+                // Enable export button if we have data
+                exportBtn.disabled = receipts.length === 0;
+                exportBtn.dataset.receiptsData = JSON.stringify(receipts);
+                exportBtn.dataset.startDate = startDate;
+                exportBtn.dataset.endDate = endDate;
+            } catch (error) {
+                console.error('Error fetching stock receipts:', error);
+                receiptsContainer.innerHTML = '<div class="no-data">Error loading data.</div>';
+                exportBtn.disabled = true;
+            }
+        }
+
+        /**
+         * Displays stock receipts in horizontal format (products as rows, dates as columns)
+         */
+        function displayStockReceiptsHorizontal(receipts) {
+            console.log('Displaying receipts:', receipts); // Debug log
+            receiptsContainer.innerHTML = ''; // Clear the container
+
+            if (receipts.length === 0) {
+                receiptsContainer.innerHTML = '<div class="no-data">No stock receipts found for the selected date range.</div>';
+                return;
+            }
+
+            // Group receipts by product and date
+            const products = {};
+            const dates = new Set();
+            
+            receipts.forEach(receipt => {
+                const productKey = `${receipt.s_no}-${receipt.description}-${receipt.unit}`;
+                dates.add(receipt.date);
+                
+                if (!products[productKey]) {
+                    products[productKey] = {
+                        s_no: receipt.s_no,
+                        description: receipt.description,
+                        unit: receipt.unit,
+                        quantities: {}
+                    };
+                }
+                
+                products[productKey].quantities[receipt.date] = receipt.quantity;
+            });
+            
+            console.log('Grouped products:', products); // Debug log
+            console.log('Dates:', dates); // Debug log
+            
+            // Store products data for filtering
+            receiptsContainer.dataset.allProducts = JSON.stringify(products);
+            
+            // Sort dates
+            const sortedDates = Array.from(dates).sort();
+            console.log('Sorted dates:', sortedDates); // Debug log
+            
+            // Create table
+            const tableContainer = document.createElement('div');
+            tableContainer.className = 'horizontal-table-container';
+            
+            const table = document.createElement('table');
+            table.className = 'horizontal-table';
+            table.id = 'receipts-table';
+            
+            // Table header
+            const thead = document.createElement('thead');
+            let headerRow = '<tr><th>S.No.</th><th>Description</th><th>Unit</th>';
+            sortedDates.forEach(date => {
+                headerRow += `<th>${date}</th>`;
+            });
+            headerRow += '</tr>';
+            thead.innerHTML = headerRow;
+            table.appendChild(thead);
+            
+            // Table body
+            const tbody = document.createElement('tbody');
+            tbody.id = 'receipts-table-body';
+            Object.values(products).forEach(product => {
+                let row = `<tr data-product-key="${product.s_no}-${product.description}-${product.unit}">`;
+                row += `<td>${product.s_no}</td><td>${product.description}</td><td>${product.unit}</td>`;
+                sortedDates.forEach(date => {
+                    const quantity = product.quantities[date] || 0;
+                    row += `<td class="number-cell">${quantity}</td>`;
+                });
+                row += '</tr>';
+                tbody.innerHTML += row;
+            });
+            table.appendChild(tbody);
+            
+            tableContainer.appendChild(table);
+            receiptsContainer.appendChild(tableContainer);
+            
+            // Apply any existing filter
+            filterTable();
+        }
+        
+        /**
+         * Filter table based on search input
+         */
+        function filterTable() {
+            const searchTerm = productSearch.value.toLowerCase().trim();
+            const table = document.getElementById('receipts-table');
+            
+            if (!table) return;
+            
+            const rows = table.querySelectorAll('tbody tr');
+            
+            rows.forEach(row => {
+                const productKey = row.dataset.productKey;
+                if (!productKey) return;
+                
+                // Extract S.No. and description from product key
+                const parts = productKey.split('-');
+                const sNo = parts[0];
+                const description = parts.slice(1, -1).join('-'); // Join all parts except first and last
+                
+                // Check if search term matches S.No. or description
+                if (searchTerm === '' || 
+                    sNo.includes(searchTerm) || 
+                    description.toLowerCase().includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        /**
+         * Exports data to Excel format
+         */
+        function exportToExcel() {
+            const receiptsData = JSON.parse(exportBtn.dataset.receiptsData);
+            const startDate = exportBtn.dataset.startDate;
+            const endDate = exportBtn.dataset.endDate;
+            
+            // Group receipts by product and date for export
+            const products = {};
+            const dates = new Set();
+            
+            receiptsData.forEach(receipt => {
+                const productKey = `${receipt.s_no}-${receipt.description}-${receipt.unit}`;
+                dates.add(receipt.date);
+                
+                if (!products[productKey]) {
+                    products[productKey] = {
+                        s_no: receipt.s_no,
+                        description: receipt.description,
+                        unit: receipt.unit,
+                        quantities: {}
+                    };
+                }
+                
+                products[productKey].quantities[receipt.date] = receipt.quantity;
+            });
+            
+            // Sort dates
+            const sortedDates = Array.from(dates).sort();
+            
+            // Create CSV content
+            let csvContent = 'S.No.,Description,Unit';
+            sortedDates.forEach(date => {
+                csvContent += `,${date}`;
+            });
+            csvContent += '\n';
+            
+            Object.values(products).forEach(product => {
+                csvContent += `${product.s_no},"${product.description}","${product.unit}"`;
+                sortedDates.forEach(date => {
+                    const quantity = product.quantities[date] || 0;
+                    csvContent += `,${quantity}`;
+                });
+                csvContent += '\n';
+            });
+            
+            // Create download link
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.setAttribute('href', url);
+            link.setAttribute('download', `stock_receipts_horizontal_${startDate}_to_${endDate}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

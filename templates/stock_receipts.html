@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Receipts Report</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            margin: 40px; 
+            background-color: #f4f7f6; 
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            background: #fff; 
+            padding: 20px; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+        }
+        h1 { 
+            color: #333; 
+            text-align: center;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 20px; 
+        }
+        th, td { 
+            text-align: left; 
+            padding: 12px; 
+            border-bottom: 1px solid #ddd; 
+        }
+        th { 
+            background-color: #f9f9f9; 
+        }
+        tr:hover { 
+            background-color: #f1f1f1; 
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+        }
+        
+        /* Navigation bar styles */
+        .navbar {
+            background-color: #343a40;
+            padding: 15px 0;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        
+        .nav-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .nav-item {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-item:hover {
+            background-color: #495057;
+        }
+        
+        .nav-item.active {
+            background-color: #007bff;
+        }
+        
+        /* Date grouping styles */
+        .date-group {
+            margin: 30px 0;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .date-header {
+            background-color: #e9ecef;
+            padding: 10px 15px;
+            font-weight: bold;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .receipts-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .receipts-table th, .receipts-table td {
+            padding: 10px 15px;
+        }
+        
+        .number-cell {
+            text-align: right;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-item">Inventory</a>
+            <a href="/stock-issues" class="nav-item">Stock Issues</a>
+            <a href="/stock-issues-date-range" class="nav-item">Stock Issues by Date Range</a>
+            <a href="/stock-receipts" class="nav-item active">Stock Receipts</a>
+            <a href="/stock-receipts-date-range" class="nav-item">Stock Receipts by Date Range</a>
+            <a href="/transaction-history" class="nav-item">Transaction History</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h1>Stock Receipts Report by Date</h1>
+        <p>This report shows products that have been received (purchased/added) according to dates in the Excel data.</p>
+        
+        <div id="receipts-container">
+            <div class="loading">Loading data...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000';
+        const receiptsContainer = document.getElementById('receipts-container');
+
+        /**
+         * Fetches stock receipts data grouped by date from the API and displays it.
+         */
+        async function fetchStockReceipts() {
+            try {
+                const response = await fetch(`${API_URL}/api/stock-receipts`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const receipts = await response.json();
+                displayStockReceipts(receipts);
+            } catch (error) {
+                console.error('Error fetching stock receipts:', error);
+                receiptsContainer.innerHTML = '<div class="no-data">Error loading data.</div>';
+            }
+        }
+
+        /**
+         * Displays stock receipts grouped by date
+         */
+        function displayStockReceipts(receipts) {
+            receiptsContainer.innerHTML = ''; // Clear the container
+
+            if (receipts.length === 0) {
+                receiptsContainer.innerHTML = '<div class="no-data">No stock receipts found.</div>';
+                return;
+            }
+
+            // Group receipts by date
+            const receiptsByDate = {};
+            receipts.forEach(receipt => {
+                if (!receiptsByDate[receipt.date]) {
+                    receiptsByDate[receipt.date] = [];
+                }
+                receiptsByDate[receipt.date].push(receipt);
+            });
+
+            // Create HTML for each date group
+            for (const [date, dateReceipts] of Object.entries(receiptsByDate)) {
+                const dateGroup = document.createElement('div');
+                dateGroup.className = 'date-group';
+                
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'date-header';
+                dateHeader.textContent = `Date: ${date}`;
+                dateGroup.appendChild(dateHeader);
+                
+                const table = document.createElement('table');
+                table.className = 'receipts-table';
+                
+                // Table header
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr>
+                        <th>S.No.</th>
+                        <th>Description</th>
+                        <th>Unit</th>
+                        <th>Quantity</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+                
+                // Table body
+                const tbody = document.createElement('tbody');
+                dateReceipts.forEach(receipt => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${receipt.s_no}</td>
+                        <td>${receipt.description}</td>
+                        <td>${receipt.unit}</td>
+                        <td class="number-cell">${receipt.quantity}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                
+                dateGroup.appendChild(table);
+                receiptsContainer.appendChild(dateGroup);
+            }
+        }
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', fetchStockReceipts);
+    </script>
+</body>
+</html>

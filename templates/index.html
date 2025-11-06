@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Inventory V3 (Import)</title>
+    <style>
+        /* Same as before */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 40px; background-color: #f4f7f6; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        h1, h2 { color: #333; }
+        form { margin-bottom: 20px; padding: 20px; background: #fafafa; border-radius: 5px; }
+        
+        /* Updated input width to make space for 4 inputs */
+        form input { width: calc(25% - 22px); padding: 10px; margin-right: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        
+        form button { padding: 10px 15px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { text-align: left; padding: 12px; border-bottom: 1px solid #ddd; }
+        th { background-color: #f9f9f9; }
+        tr:hover { background-color: #f1f1f1; }
+
+        .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; color: white; font-size: 0.9em; }
+        .stock-in { background-color: #28a745; } /* Green */
+        .stock-out { background-color: #dc3545; } /* Red */
+        
+        /* Modal styles for purchase/sale forms */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 50%;
+            border-radius: 5px;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: black;
+        }
+        
+        /* Search bar styles */
+        .search-container {
+            margin: 20px 0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-container input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: auto;
+        }
+        
+        .search-container button {
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .clear-search {
+            background-color: #6c757d !important;
+        }
+        
+        /* Navigation bar styles */
+        .navbar {
+            background-color: #343a40;
+            padding: 15px 0;
+            margin-bottom: 30px;
+            border-radius: 5px;
+        }
+        
+        .nav-container {
+            max-width: 900px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+        }
+        
+        .nav-item {
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            margin: 0 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        
+        .nav-item:hover {
+            background-color: #495057;
+        }
+        
+        .nav-item.active {
+            background-color: #007bff;
+        }
+        
+        /* Table styles for additional columns */
+        .number-cell {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <div class="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-item active">Inventory</a>
+            <a href="/stock-issues" class="nav-item">Stock Issues</a>
+            <a href="/stock-issues-date-range" class="nav-item">Stock Issues by Date Range</a>
+            <a href="/stock-receipts" class="nav-item">Stock Receipts</a>
+            <a href="/stock-receipts-date-range" class="nav-item">Stock Receipts by Date Range</a>
+            <a href="/transaction-history" class="nav-item">Transaction History</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h1>Inventory Management System V3</h1>
+        <p>
+            To import data from your CSV, please 
+            <a href="/api/import-stock" target="_blank" id="import-link">click this link ONCE</a>. 
+            After clicking, come back to this page and refresh.
+        </p>
+
+        <h2>Add New Product</h2>
+        <form id="add-product-form">
+            <input type="text" id="sku" placeholder="SKU" required>
+            <input type="text" id="name" placeholder="Product Name" required>
+            <input type="text" id="unit" placeholder="Unit (e.g., PCS)" required>
+            <input type="number" id="initial_quantity" placeholder="Initial Quantity" required>
+            <input type="date" id="product-date" placeholder="Date (optional)">
+            <button type="submit">Add Product</button>
+        </form>
+
+        <h2>Current Stock</h2>
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search by product name or SKU...">
+            <button id="search-button">Search</button>
+            <button id="clear-search" class="clear-search">Clear</button>
+        </div>
+        <table id="product-table">
+            <thead>
+                <tr>
+                    <th>SKU</th>
+                    <th>Name</th>
+                    <th>Unit</th>
+                    <th>Opening</th>
+                    <th>Receipt</th>
+                    <th>Issue</th>
+                    <th>Balance</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="product-list">
+                </tbody>
+        </table>
+    </div>
+
+    <!-- Purchase Modal -->
+    <div id="purchase-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" data-modal="purchase">&times;</span>
+            <h2>Record Purchase</h2>
+            <form id="purchase-form">
+                <input type="hidden" id="purchase-product-id">
+                <p>Product: <span id="purchase-product-name"></span></p>
+                <input type="number" id="purchase-quantity" placeholder="Quantity" required>
+                <input type="date" id="purchase-date" placeholder="Date (optional)">
+                <input type="text" id="purchase-supplier" placeholder="Supplier (optional)">
+                <input type="text" id="purchase-notes" placeholder="Notes (optional)">
+                <button type="submit">Record Purchase</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Sale Modal -->
+    <div id="sale-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" data-modal="sale">&times;</span>
+            <h2>Record Sale</h2>
+            <form id="sale-form">
+                <input type="hidden" id="sale-product-id">
+                <p>Product: <span id="sale-product-name"></span></p>
+                <input type="number" id="sale-quantity" placeholder="Quantity" required>
+                <input type="date" id="sale-date" placeholder="Date (optional)">
+                <input type="text" id="sale-customer" placeholder="Customer (optional)">
+                <input type="text" id="sale-notes" placeholder="Notes (optional)">
+                <button type="submit">Record Sale</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://127.0.0.1:5000';
+        const addForm = document.getElementById('add-product-form');
+        const productList = document.getElementById('product-list');
+        const searchInput = document.getElementById('search-input');
+        const searchButton = document.getElementById('search-button');
+        const clearSearchButton = document.getElementById('clear-search');
+
+        /**
+         * Fetches all products from the API and displays them in the table.
+         */
+        async function fetchProducts() {
+            try {
+                const response = await fetch(`${API_URL}/api/products`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const products = await response.json();
+                displayProducts(products);
+            } catch (error) {
+                console.error('Error fetching products:', error);
+                productList.innerHTML = '<tr><td colspan="8">Error loading products.</td></tr>';
+            }
+        }
+        
+        /**
+         * Displays products in the table
+         */
+        function displayProducts(products) {
+            productList.innerHTML = ''; // Clear the table
+
+            if (products.length === 0) {
+                productList.innerHTML = '<tr><td colspan="8">No products found.</td></tr>';
+                return;
+            }
+
+            products.forEach(product => {
+                const row = `
+                    <tr>
+                        <td>${product.sku}</td>
+                        <td>${product.name}</td>
+                        <td>${product.unit}</td>
+                        <td class="number-cell">${product.opening}</td>
+                        <td class="number-cell">${product.receipt}</td>
+                        <td class="number-cell">${product.issue}</td>
+                        <td class="number-cell">${product.quantity}</td>
+                        <td>
+                            <button class="action-btn stock-in" data-id="${product.id}" data-name="${product.name}">Stock In</button>
+                            <button class="action-btn stock-out" data-id="${product.id}" data-name="${product.name}">Stock Out</button>
+                        </td>
+                    </tr>
+                `;
+                productList.innerHTML += row;
+            });
+        }
+
+        /**
+         * Search products by name or SKU
+         */
+        async function searchProducts() {
+            const query = searchInput.value.trim();
+            
+            if (!query) {
+                // If search is empty, fetch all products
+                await fetchProducts();
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/products/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const products = await response.json();
+                displayProducts(products);
+            } catch (error) {
+                console.error('Error searching products:', error);
+                productList.innerHTML = '<tr><td colspan="8">Error searching products.</td></tr>';
+            }
+        }
+
+        /**
+         * Handles the form submission to add a new product.
+         */
+        addForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); 
+
+            const sku = document.getElementById('sku').value;
+            const name = document.getElementById('name').value;
+            const unit = document.getElementById('unit').value;
+            const quantity = document.getElementById('initial_quantity').value;
+            const date = document.getElementById('product-date').value;
+
+            const productData = { sku, name, unit, quantity };
+            if (date) {
+                productData.date = date;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/product`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(productData),
+                });
+
+                if (response.ok) {
+                    addForm.reset();
+                    // Refresh the product list
+                    if (searchInput.value.trim()) {
+                        // If there's a search query, search again
+                        await searchProducts();
+                    } else {
+                        // Otherwise fetch all products
+                        await fetchProducts();
+                    }
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error('Error adding product:', error);
+                alert('An error occurred while adding the product.');
+            }
+        });
+
+        
+        // Enhanced stock change handler with modals
+        async function handleStockChange(event) {
+            const target = event.target;
+            const isStockIn = target.classList.contains('stock-in');
+            const isStockOut = target.classList.contains('stock-out');
+
+            if (!isStockIn && !isStockOut) return;
+
+            const productId = target.dataset.id;
+            const productName = target.dataset.name;
+            
+            if (isStockIn) {
+                // Show purchase modal
+                document.getElementById('purchase-product-id').value = productId;
+                document.getElementById('purchase-product-name').textContent = productName;
+                document.getElementById('purchase-quantity').value = '';
+                document.getElementById('purchase-supplier').value = '';
+                document.getElementById('purchase-notes').value = '';
+                document.getElementById('purchase-modal').style.display = 'block';
+            } else if (isStockOut) {
+                // Show sale modal
+                document.getElementById('sale-product-id').value = productId;
+                document.getElementById('sale-product-name').textContent = productName;
+                document.getElementById('sale-quantity').value = '';
+                document.getElementById('sale-customer').value = '';
+                document.getElementById('sale-notes').value = '';
+                document.getElementById('sale-modal').style.display = 'block';
+            }
+        }
+        
+        // Handle purchase form submission
+        document.getElementById('purchase-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const productId = document.getElementById('purchase-product-id').value;
+            const productName = document.getElementById('purchase-product-name').textContent;
+            const quantity = document.getElementById('purchase-quantity').value;
+            const date = document.getElementById('purchase-date').value;
+            const supplier = document.getElementById('purchase-supplier').value;
+            const notes = document.getElementById('purchase-notes').value;
+            
+            const purchaseData = {
+                product_id: productId,
+                quantity: quantity,
+                supplier: supplier,
+                notes: notes
+            };
+            
+            if (date) {
+                purchaseData.date = date;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/purchase`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(purchaseData),
+                });
+
+                if (response.ok) {
+                    document.getElementById('purchase-modal').style.display = 'none';
+                    // Refresh the product list
+                    if (searchInput.value.trim()) {
+                        // If there's a search query, search again
+                        await searchProducts();
+                    } else {
+                        // Otherwise fetch all products
+                        await fetchProducts();
+                    }
+                    alert('Purchase recorded successfully!');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error('Error recording purchase:', error);
+                alert('An error occurred while recording the purchase.');
+            }
+        });
+        
+        // Handle sale form submission
+        document.getElementById('sale-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const productId = document.getElementById('sale-product-id').value;
+            const productName = document.getElementById('sale-product-name').textContent;
+            const quantity = document.getElementById('sale-quantity').value;
+            const date = document.getElementById('sale-date').value;
+            const customer = document.getElementById('sale-customer').value;
+            const notes = document.getElementById('sale-notes').value;
+            
+            const saleData = {
+                product_id: productId,
+                quantity: quantity,
+                customer: customer,
+                notes: notes
+            };
+            
+            if (date) {
+                saleData.date = date;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/api/sale`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(saleData),
+                });
+
+                if (response.ok) {
+                    document.getElementById('sale-modal').style.display = 'none';
+                    // Refresh the product list
+                    if (searchInput.value.trim()) {
+                        // If there's a search query, search again
+                        await searchProducts();
+                    } else {
+                        // Otherwise fetch all products
+                        await fetchProducts();
+                    }
+                    alert('Sale recorded successfully!');
+                } else {
+                    const errorData = await response.json();
+                    alert(`Error: ${errorData.error}`);
+                }
+            } catch (error) {
+                console.error('Error recording sale:', error);
+                alert('An error occurred while recording the sale.');
+            }
+        });
+        
+        // Close modals
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', () => {
+                const modalType = closeBtn.dataset.modal;
+                document.getElementById(`${modalType}-modal`).style.display = 'none';
+            });
+        });
+        
+        // Close modals when clicking outside
+        window.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        });
+        
+        // Search functionality
+        searchButton.addEventListener('click', searchProducts);
+        
+        // Clear search
+        clearSearchButton.addEventListener('click', async () => {
+            searchInput.value = '';
+            await fetchProducts();
+        });
+        
+        // Search when pressing Enter in the search input
+        searchInput.addEventListener('keypress', async (event) => {
+            if (event.key === 'Enter') {
+                await searchProducts();
+            }
+        });
+        
+        // Also search as the user types (with debounce)
+        let searchTimeout;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(searchProducts, 300);
+        });
+        
+        productList.addEventListener('click', handleStockChange);
+        document.addEventListener('DOMContentLoaded', fetchProducts);
+    </script>
+</body>
+</html>
