@@ -125,18 +125,6 @@ def home():
     return render_template('index.html')
 
 
-@app.route('/stock-issues')
-def stock_issues():
-    """Render the stock issues report page"""
-    return render_template('stock_issues.html')
-
-
-@app.route('/stock-receipts')
-def stock_receipts():
-    """Render the stock receipts report page"""
-    return render_template('stock_receipts.html')
-
-
 @app.route('/stock-issues-date-range')
 def stock_issues_date_range():
     """Render the stock issues by date range report page"""
@@ -162,10 +150,17 @@ def get_products():
     try:
         db = get_db()
         cursor = db.cursor()
+        
+        # Calculate dynamic receipt and issue values from transaction history
         query = """
             SELECT 
-                p.id, p.sku, p.name, p.unit, p.opening, p.receipt, p.issue, p.balance
+                p.id, p.sku, p.name, p.unit, p.opening,
+                COALESCE(SUM(CASE WHEN t.type = 'purchase' THEN t.quantity_change ELSE 0 END), 0) AS receipt,
+                COALESCE(SUM(CASE WHEN t.type = 'sale' THEN ABS(t.quantity_change) ELSE 0 END), 0) AS issue,
+                COALESCE(SUM(t.quantity_change), 0) AS balance
             FROM products p
+            LEFT JOIN InventoryTransactions t ON p.id = t.product_id
+            GROUP BY p.id, p.sku, p.name, p.unit, p.opening
             ORDER BY p.name;
         """
         cursor.execute(query)
@@ -423,11 +418,17 @@ def search_products():
     
     # Search for products matching the query in name or SKU
     search_term = f"%{query}%"
+    # Calculate dynamic receipt and issue values from transaction history
     cursor.execute("""
         SELECT 
-            p.id, p.sku, p.name, p.unit, p.opening, p.receipt, p.issue, p.balance
+            p.id, p.sku, p.name, p.unit, p.opening,
+            COALESCE(SUM(CASE WHEN t.type = 'purchase' THEN t.quantity_change ELSE 0 END), 0) AS receipt,
+            COALESCE(SUM(CASE WHEN t.type = 'sale' THEN ABS(t.quantity_change) ELSE 0 END), 0) AS issue,
+            COALESCE(SUM(t.quantity_change), 0) AS balance
         FROM products p
+        LEFT JOIN InventoryTransactions t ON p.id = t.product_id
         WHERE p.name LIKE ? OR p.sku LIKE ?
+        GROUP BY p.id, p.sku, p.name, p.unit, p.opening
         ORDER BY p.name
     """, (search_term, search_term))
     
@@ -436,112 +437,6 @@ def search_products():
     db.close()
     
     return jsonify(products)
-
-
-@app.route('/api/stock-issues', methods=['GET'])
-def get_stock_issues():
-    """Get stock issues data grouped by date from database"""
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        
-        # Get all sale transactions with product information
-        # Also include initial transactions as they represent the opening stock
-        query = """
-            SELECT 
-                t.id, t.product_id, t.type, t.quantity_change, t.notes, t.timestamp,
-                p.sku, p.name, p.unit
-            FROM InventoryTransactions t
-            JOIN products p ON t.product_id = p.id
-            WHERE t.type = 'sale' OR t.type = 'initial'
-            ORDER BY t.timestamp DESC
-        """
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        
-        # Group by date and format data
-        issues_by_date = []
-        for row in rows:
-            # Extract date from timestamp (format: YYYY-MM-DD HH:MM:SS)
-            timestamp = row['timestamp']
-            if timestamp:
-                # Parse timestamp and format as DD.MM.YYYY
-                date_obj = datetime.datetime.strptime(timestamp.split(' ')[0], '%Y-%m-%d')
-                formatted_date = date_obj.strftime('%d.%m.%Y')
-            else:
-                formatted_date = 'Unknown Date'
-            
-            # For stock issues, we want to show negative quantities as positive values
-            # Initial transactions are positive (opening stock), but for issues we might want to show them as well
-            # Let's include initial transactions as they represent the opening stock (which can be considered as "available for issue")
-            issues_by_date.append({
-                'date': formatted_date,
-                's_no': row['product_id'],  # Using product_id as S.NO. for database consistency
-                'description': row['name'],
-                'unit': row['unit'],
-                'quantity': abs(row['quantity_change'])  # Make it positive for display
-            })
-        
-        db.close()
-        return jsonify(issues_by_date)
-    except Exception as e:
-        print(f"Error in get_stock_issues: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Failed to fetch stock issues by date: {str(e)}'}), 500
-
-
-@app.route('/api/stock-receipts', methods=['GET'])
-def get_stock_receipts():
-    """Get stock receipts data grouped by date from database"""
-    try:
-        db = get_db()
-        cursor = db.cursor()
-        
-        # Get all purchase transactions with product information
-        # Also include initial transactions as they represent the opening stock
-        query = """
-            SELECT 
-                t.id, t.product_id, t.type, t.quantity_change, t.notes, t.timestamp,
-                p.sku, p.name, p.unit
-            FROM InventoryTransactions t
-            JOIN products p ON t.product_id = p.id
-            WHERE t.type = 'purchase' OR t.type = 'initial'
-            ORDER BY t.timestamp DESC
-        """
-        cursor.execute(query)
-        rows = cursor.fetchall()
-        
-        # Group by date and format data
-        receipts_by_date = []
-        for row in rows:
-            # Extract date from timestamp (format: YYYY-MM-DD HH:MM:SS)
-            timestamp = row['timestamp']
-            if timestamp:
-                # Parse timestamp and format as DD.MM.YYYY
-                date_obj = datetime.datetime.strptime(timestamp.split(' ')[0], '%Y-%m-%d')
-                formatted_date = date_obj.strftime('%d.%m.%Y')
-            else:
-                formatted_date = 'Unknown Date'
-            
-            # For stock receipts, we want to show positive quantities (inflows)
-            # Initial transactions are positive (opening stock), which can be considered as receipts
-            # Purchase transactions are also positive
-            receipts_by_date.append({
-                'date': formatted_date,
-                's_no': row['product_id'],  # Using product_id as S.NO. for database consistency
-                'description': row['name'],
-                'unit': row['unit'],
-                'quantity': row['quantity_change']  # Already positive for purchases and initial
-            })
-        
-        db.close()
-        return jsonify(receipts_by_date)
-    except Exception as e:
-        print(f"Error in get_stock_receipts: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'error': f'Failed to fetch stock receipts by date: {str(e)}'}), 500
 
 
 @app.route('/api/stock-issues-date-range', methods=['GET'])
