@@ -223,6 +223,15 @@
         const searchButton = document.getElementById('search-button');
         const clearSearchButton = document.getElementById('clear-search');
 
+        // Set current date as default for date inputs
+        function setCurrentDate() {
+            const today = new Date();
+            const formattedDate = today.toISOString().split('T')[0];
+            
+            // Set current date for add product form
+            document.getElementById('product-date').value = formattedDate;
+        }
+
         /**
          * Fetches all products from the API and displays them in the table.
          */
@@ -322,6 +331,8 @@
 
                 if (response.ok) {
                     addForm.reset();
+                    // Reset to current date
+                    setCurrentDate();
                     // Refresh the product list
                     if (searchInput.value.trim()) {
                         // If there's a search query, search again
@@ -359,6 +370,9 @@
                 document.getElementById('purchase-quantity').value = '';
                 document.getElementById('purchase-supplier').value = '';
                 document.getElementById('purchase-notes').value = '';
+                // Set current date as default
+                const today = new Date();
+                document.getElementById('purchase-date').value = today.toISOString().split('T')[0];
                 document.getElementById('purchase-modal').style.display = 'block';
             } else if (isStockOut) {
                 // Show sale modal
@@ -367,6 +381,9 @@
                 document.getElementById('sale-quantity').value = '';
                 document.getElementById('sale-customer').value = '';
                 document.getElementById('sale-notes').value = '';
+                // Set current date as default
+                const today = new Date();
+                document.getElementById('sale-date').value = today.toISOString().split('T')[0];
                 document.getElementById('sale-modal').style.display = 'block';
             }
         }
@@ -510,7 +527,10 @@
         });
         
         productList.addEventListener('click', handleStockChange);
-        document.addEventListener('DOMContentLoaded', fetchProducts);
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchProducts();
+            setCurrentDate();
+        });
     </script>
 </body>
 </html>
