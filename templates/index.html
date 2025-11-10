@@ -20,9 +20,14 @@
         th { background-color: #f9f9f9; }
         tr:hover { background-color: #f1f1f1; }
 
-        .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; color: white; font-size: 0.9em; }
+        .action-btn { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; color: white; font-size: 0.9em; display: inline-block; }
         .stock-in { background-color: #28a745; } /* Green */
         .stock-out { background-color: #dc3545; } /* Red */
+        
+        /* Ensure buttons stay side by side */
+        .buttons-container {
+            white-space: nowrap;
+        }
         
         /* Modal styles for purchase/sale forms */
         .modal {
@@ -256,10 +261,12 @@
                         <td class="number-cell">${product.opening}</td>
                         <td class="number-cell">${product.receipt}</td>
                         <td class="number-cell">${product.issue}</td>
-                        <td class="number-cell">${product.quantity}</td>
+                        <td class="number-cell">${product.balance}</td>
                         <td>
-                            <button class="action-btn stock-in" data-id="${product.id}" data-name="${product.name}">Stock In</button>
-                            <button class="action-btn stock-out" data-id="${product.id}" data-name="${product.name}">Stock Out</button>
+                            <div style="white-space: nowrap;">
+                                <button class="action-btn stock-in" data-id="${product.id}" data-name="${product.name}" style="margin-right: 5px;">Stock In</button>
+                                <button class="action-btn stock-out" data-id="${product.id}" data-name="${product.name}">Stock Out</button>
+                            </div>
                         </td>
                     </tr>
                 `;

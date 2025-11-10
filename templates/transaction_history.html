@@ -195,6 +195,8 @@
         
         <div class="search-container">
             <input type="text" id="product-search" placeholder="Search by product name or SKU...">
+            <input type="date" id="start-date" placeholder="Start Date">
+            <input type="date" id="end-date" placeholder="End Date">
             <button id="search-button">Search</button>
             <button id="clear-search" class="clear-search">Clear</button>
         </div>
@@ -234,6 +236,8 @@
         const API_URL = 'http://127.0.0.1:5000';
         const transactionsList = document.getElementById('transactions-list');
         const productSearch = document.getElementById('product-search');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
         const searchButton = document.getElementById('search-button');
         const clearSearchButton = document.getElementById('clear-search');
         const deleteModal = document.getElementById('delete-modal');
@@ -251,6 +255,47 @@
                 transactionsList.innerHTML = '<tr><td colspan="6" class="loading">Loading transactions...</td></tr>';
                 
                 const response = await fetch(`${API_URL}/api/all-transactions`);
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const transactions = await response.json();
+                displayTransactions(transactions);
+            } catch (error) {
+                console.error('Error fetching transactions:', error);
+                transactionsList.innerHTML = '<tr><td colspan="6" class="no-data">Error loading transactions.</td></tr>';
+            }
+        }
+        
+        /**
+         * Fetches transactions with filters (search term and/or date range)
+         */
+        async function fetchFilteredTransactions() {
+            try {
+                transactionsList.innerHTML = '<tr><td colspan="6" class="loading">Loading transactions...</td></tr>';
+                
+                const searchTerm = productSearch.value.trim();
+                const startDate = startDateInput.value;
+                const endDate = endDateInput.value;
+                
+                let url = `${API_URL}/api/transactions/filter`;
+                const params = new URLSearchParams();
+                
+                if (searchTerm) {
+                    params.append('q', searchTerm);
+                }
+                
+                if (startDate) {
+                    params.append('start_date', startDate);
+                }
+                
+                if (endDate) {
+                    params.append('end_date', endDate);
+                }
+                
+                if (params.toString()) {
+                    url += `?${params.toString()}`;
+                }
+                
+                const response = await fetch(url);
                 if (!response.ok) throw new Error('Network response was not ok');
                 
                 const transactions = await response.json();
@@ -292,26 +337,7 @@
          * Search transactions by product name or SKU
          */
         async function searchTransactions() {
-            const query = productSearch.value.trim();
-            
-            if (!query) {
-                // If search is empty, fetch all transactions
-                await fetchTransactions();
-                return;
-            }
-            
-            try {
-                transactionsList.innerHTML = '<tr><td colspan="6" class="loading">Searching...</td></tr>';
-                
-                const response = await fetch(`${API_URL}/api/transactions/search?q=${encodeURIComponent(query)}`);
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                const transactions = await response.json();
-                displayTransactions(transactions);
-            } catch (error) {
-                console.error('Error searching transactions:', error);
-                transactionsList.innerHTML = '<tr><td colspan="6" class="no-data">Error searching transactions.</td></tr>';
-            }
+            await fetchFilteredTransactions();
         }
 
         /**
@@ -325,7 +351,7 @@
 
                 if (response.ok) {
                     // Refresh the transaction list
-                    await fetchTransactions();
+                    await fetchFilteredTransactions();
                     alert('Transaction deleted successfully!');
                 } else {
                     const errorData = await response.json();
@@ -342,6 +368,8 @@
         
         clearSearchButton.addEventListener('click', async () => {
             productSearch.value = '';
+            startDateInput.value = '';
+            endDateInput.value = '';
             await fetchTransactions();
         });
         
@@ -350,6 +378,10 @@
                 await searchTransactions();
             }
         });
+        
+        // Handle date input changes
+        startDateInput.addEventListener('change', searchTransactions);
+        endDateInput.addEventListener('change', searchTransactions);
         
         // Handle delete button clicks
         transactionsList.addEventListener('click', (event) => {
